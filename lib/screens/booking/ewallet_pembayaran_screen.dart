@@ -29,7 +29,7 @@ class _EwalletPembayaranScreenState extends State<EwalletPembayaranScreen> {
     {'id': 'dana', 'label': 'DANA', 'color': Color(0xFF108EE9)},
   ];
 
-  Future<void> _bayarViaEwallet(String ewalletId, String ewalletLabel) async {
+  Future<void> _bayarViaEwallet(String ewalletLabel) async {
     setState(() {
       _isProcessing = true;
       _ewalletTerpilih = ewalletLabel;
@@ -143,7 +143,6 @@ class _EwalletPembayaranScreenState extends State<EwalletPembayaranScreen> {
           ..._ewalletList.map((ew) {
             final label = ew['label'] as String;
             final color = ew['color'] as Color;
-            final id = ew['id'] as String;
             final selected = _ewalletTerpilih == label && _isProcessing;
 
             return Padding(
@@ -155,7 +154,7 @@ class _EwalletPembayaranScreenState extends State<EwalletPembayaranScreen> {
                   borderRadius: BorderRadius.circular(14),
                   onTap: _isProcessing
                       ? null
-                      : () => _bayarViaEwallet(id, label),
+                      : () => _bayarViaEwallet(label),
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
