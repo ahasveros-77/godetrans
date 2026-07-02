@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/formatters.dart';
+import '../../utils/payment_qr_codec.dart';
 import '../../models/booking_model.dart';
 import '../../services/auth_service.dart';
 import '../../services/booking_service.dart';
 import '../../provider/booking_provider.dart';
 import '../../widgets/primary_button.dart';
 import 'pembayaran_berhasil_screen.dart';
+import 'scan_qr_pembayaran_screen.dart';
 
 class PembayaranScreen extends StatefulWidget {
   const PembayaranScreen({super.key});
@@ -17,15 +20,35 @@ class PembayaranScreen extends StatefulWidget {
 }
 
 class _PembayaranScreenState extends State<PembayaranScreen> {
+  static const _metodeEwallet = 'E-Wallet (OVO/GoPay/Dana)';
+
   String _metodeTerpilih = 'Transfer Bank';
   bool _isProcessing = false;
   String? _error;
+  late String _kodeBooking;
 
   final _metodeList = const [
     {'label': 'Transfer Bank', 'icon': Icons.account_balance_outlined},
-    {'label': 'E-Wallet (OVO/GoPay/Dana)', 'icon': Icons.account_balance_wallet_outlined},
+    {'label': _metodeEwallet, 'icon': Icons.account_balance_wallet_outlined},
     {'label': 'Kartu Kredit/Debit', 'icon': Icons.credit_card_outlined},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _kodeBooking = Formatters.generateKodeBooking();
+  }
+
+  bool get _isEwallet => _metodeTerpilih == _metodeEwallet;
+
+  PaymentQrPayload _buildQrPayload(BookingProvider provider) {
+    return PaymentQrPayload(
+      amount: provider.totalBayar,
+      merchant: 'GodeTrans',
+      ref: _kodeBooking,
+      description: '${provider.asal} → ${provider.tujuan}',
+    );
+  }
 
   Future<void> _bayarSekarang() async {
     setState(() {
@@ -36,7 +59,7 @@ class _PembayaranScreenState extends State<PembayaranScreen> {
     final user = await AuthService.getCurrentUser();
 
     final booking = BookingModel(
-      id: Formatters.generateKodeBooking(),
+      id: _kodeBooking,
       userId: user?.id ?? '',
       asal: provider.asal,
       tujuan: provider.tujuan,
@@ -54,20 +77,20 @@ class _PembayaranScreenState extends State<PembayaranScreen> {
     );
 
     try {
-      // Simulasi proses pembayaran (tanpa gateway nyata).
       await Future.delayed(const Duration(seconds: 1));
       final saved = await BookingService.createBooking(booking);
       provider.reset();
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => PembayaranBerhasilScreen(kodeBooking: saved.id),
+          builder: (_) => PembayaranBerhasilScreen(
+            kodeBooking: saved.id,
+            metodePembayaran: _metodeTerpilih,
+          ),
         ),
         (route) => route.isFirst,
       );
     } catch (e) {
-      // Tetap tampilkan sukses secara lokal walau server belum terhubung,
-      // supaya alur pemesanan tetap bisa dicoba end-to-end saat development.
       setState(() {
         _error = e.toString().replaceAll('Exception: ', '');
       });
@@ -75,13 +98,85 @@ class _PembayaranScreenState extends State<PembayaranScreen> {
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => PembayaranBerhasilScreen(kodeBooking: booking.id),
+          builder: (_) => PembayaranBerhasilScreen(
+            kodeBooking: booking.id,
+            metodePembayaran: _metodeTerpilih,
+          ),
         ),
         (route) => route.isFirst,
       );
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
+  }
+
+  void _bukaScannerQr() {
+    final provider = context.read<BookingProvider>();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ScanQrPembayaranScreen(
+          expectedPayload: _buildQrPayload(provider),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQrSection(BookingProvider provider) {
+    final payload = _buildQrPayload(provider);
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary, width: 1.2),
+      ),
+      child: Column(
+        children: [
+          const Text('QR Pembayaran', style: AppTextStyles.h3),
+          const SizedBox(height: 4),
+          const Text(
+            'Scan QR ini dengan e-wallet untuk melihat nominal dan menyelesaikan pembayaran.',
+            style: AppTextStyles.caption,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: QrImageView(
+              data: payload.encode(),
+              version: QrVersions.auto,
+              size: 200,
+              backgroundColor: Colors.white,
+              eyeStyle: const QrEyeStyle(
+                eyeShape: QrEyeShape.square,
+                color: AppColors.textPrimary,
+              ),
+              dataModuleStyle: const QrDataModuleStyle(
+                dataModuleShape: QrDataModuleShape.square,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            Formatters.rupiah(provider.totalBayar),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text('Ref: $_kodeBooking', style: AppTextStyles.caption),
+        ],
+      ),
+    );
   }
 
   @override
@@ -143,13 +238,16 @@ class _PembayaranScreenState extends State<PembayaranScreen> {
                       selected
                           ? Icons.radio_button_checked
                           : Icons.radio_button_off,
-                      color: selected ? AppColors.primary : AppColors.textSecondary,
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
                     ),
                   ],
                 ),
               ),
             );
           }),
+          if (_isEwallet) _buildQrSection(provider),
           if (_error != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -161,11 +259,17 @@ class _PembayaranScreenState extends State<PembayaranScreen> {
       ),
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(20),
-        child: PrimaryButton(
-          label: 'Bayar Sekarang',
-          isLoading: _isProcessing,
-          onPressed: _bayarSekarang,
-        ),
+        child: _isEwallet
+            ? PrimaryButton(
+                label: 'Scan QR & Bayar',
+                isLoading: _isProcessing,
+                onPressed: _bukaScannerQr,
+              )
+            : PrimaryButton(
+                label: 'Bayar Sekarang',
+                isLoading: _isProcessing,
+                onPressed: _bayarSekarang,
+              ),
       ),
     );
   }

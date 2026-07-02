@@ -4,8 +4,13 @@ import '../tickets/tiket_saya_screen.dart';
 
 class PembayaranBerhasilScreen extends StatelessWidget {
   final String kodeBooking;
+  final String? metodePembayaran;
 
-  const PembayaranBerhasilScreen({super.key, required this.kodeBooking});
+  const PembayaranBerhasilScreen({
+    super.key,
+    required this.kodeBooking,
+    this.metodePembayaran,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +47,14 @@ class PembayaranBerhasilScreen extends StatelessWidget {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary)),
+              if (metodePembayaran != null) ...[
+                const SizedBox(height: 16),
+                const Text('Metode Pembayaran', style: AppTextStyles.caption),
+                const SizedBox(height: 4),
+                Text(metodePembayaran!,
+                    style: AppTextStyles.body,
+                    textAlign: TextAlign.center),
+              ],
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,
