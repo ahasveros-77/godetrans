@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/payment_qr_codec.dart';
+import '../../utils/payment_qr_handler.dart';
+import '../../widgets/web_qr_scan_panel.dart';
 import 'ewallet_pembayaran_screen.dart';
 
 class ScanQrPembayaranScreen extends StatefulWidget {
@@ -14,30 +17,33 @@ class ScanQrPembayaranScreen extends StatefulWidget {
 }
 
 class _ScanQrPembayaranScreenState extends State<ScanQrPembayaranScreen> {
-  final MobileScannerController _controller = MobileScannerController();
+  MobileScannerController? _controller;
   bool _hasScanned = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb) {
+      _controller = MobileScannerController(formats: const [BarcodeFormat.qrCode]);
+    }
+  }
 
   void _handleScan(String raw) {
     if (_hasScanned) return;
 
-    final payload = PaymentQrPayload.decode(raw);
-    if (payload == null) {
+    final error = PaymentQrHandler.validate(raw, widget.expectedPayload);
+    if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('QR tidak valid. Gunakan QR pembayaran GodeTrans.')),
+        SnackBar(content: Text(error)),
       );
       return;
     }
 
-    if (widget.expectedPayload != null &&
-        payload.amount != widget.expectedPayload!.amount) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Nominal QR tidak sesuai dengan pesanan.')),
-      );
-      return;
-    }
+    final payload = PaymentQrHandler.parse(raw);
+    if (payload == null) return;
 
     setState(() => _hasScanned = true);
-    _controller.stop();
+    _controller?.stop();
 
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
@@ -46,7 +52,7 @@ class _ScanQrPembayaranScreenState extends State<ScanQrPembayaranScreen> {
     );
   }
 
-  void _simulasiScan() {
+  void _continueWithoutScan() {
     final payload = widget.expectedPayload;
     if (payload == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -57,14 +63,28 @@ class _ScanQrPembayaranScreenState extends State<ScanQrPembayaranScreen> {
     _handleScan(payload.encode());
   }
 
+  void _simulasiScan() => _continueWithoutScan();
+
   @override
   void dispose() {
-    _controller.dispose();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (kIsWeb) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('Scan QR Pembayaran (Web)')),
+        body: WebQrScanPanel(
+          expectedPayload: widget.expectedPayload,
+          onScan: _handleScan,
+          onContinueWithoutScan: _continueWithoutScan,
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -81,8 +101,7 @@ class _ScanQrPembayaranScreenState extends State<ScanQrPembayaranScreen> {
                 MobileScanner(
                   controller: _controller,
                   onDetect: (capture) {
-                    final barcodes = capture.barcodes;
-                    for (final barcode in barcodes) {
+                    for (final barcode in capture.barcodes) {
                       final raw = barcode.rawValue;
                       if (raw != null && raw.isNotEmpty) {
                         _handleScan(raw);

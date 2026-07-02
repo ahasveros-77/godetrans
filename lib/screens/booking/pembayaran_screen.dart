@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -11,6 +12,7 @@ import '../../provider/booking_provider.dart';
 import '../../widgets/primary_button.dart';
 import 'pembayaran_berhasil_screen.dart';
 import 'scan_qr_pembayaran_screen.dart';
+import 'ewallet_pembayaran_screen.dart';
 
 class PembayaranScreen extends StatefulWidget {
   const PembayaranScreen({super.key});
@@ -121,6 +123,17 @@ class _PembayaranScreenState extends State<PembayaranScreen> {
     );
   }
 
+  void _lanjutKeEwallet() {
+    final provider = context.read<BookingProvider>();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EwalletPembayaranScreen(
+          payload: _buildQrPayload(provider),
+        ),
+      ),
+    );
+  }
+
   Widget _buildQrSection(BookingProvider provider) {
     final payload = _buildQrPayload(provider);
     return Container(
@@ -140,6 +153,14 @@ class _PembayaranScreenState extends State<PembayaranScreen> {
             style: AppTextStyles.caption,
             textAlign: TextAlign.center,
           ),
+          if (kIsWeb) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Web Preview: QR dapat discan via kamera browser atau lanjutkan langsung ke e-wallet.',
+              style: AppTextStyles.caption.copyWith(color: AppColors.primary),
+              textAlign: TextAlign.center,
+            ),
+          ],
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(12),
@@ -260,11 +281,37 @@ class _PembayaranScreenState extends State<PembayaranScreen> {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(20),
         child: _isEwallet
-            ? PrimaryButton(
-                label: 'Scan QR & Bayar',
-                isLoading: _isProcessing,
-                onPressed: _bukaScannerQr,
-              )
+            ? (kIsWeb
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      PrimaryButton(
+                        label: 'Scan QR & Bayar',
+                        isLoading: _isProcessing,
+                        onPressed: _bukaScannerQr,
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton(
+                        onPressed: _isProcessing ? null : _lanjutKeEwallet,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          side: const BorderSide(color: AppColors.primary),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          'Bayar Langsung via E-Wallet (Web)',
+                          style: TextStyle(color: AppColors.primary),
+                        ),
+                      ),
+                    ],
+                  )
+                : PrimaryButton(
+                    label: 'Scan QR & Bayar',
+                    isLoading: _isProcessing,
+                    onPressed: _bukaScannerQr,
+                  ))
             : PrimaryButton(
                 label: 'Bayar Sekarang',
                 isLoading: _isProcessing,

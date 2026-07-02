@@ -188,7 +188,7 @@ class _EwalletPembayaranScreenState extends State<EwalletPembayaranScreen> {
                             children: [
                               Text('Bayar dengan $label',
                                   style: AppTextStyles.h3),
-                              const Text('Simulasi redirect ke $label',
+                              Text('Simulasi redirect ke $label',
                                   style: AppTextStyles.caption),
                             ],
                           ),

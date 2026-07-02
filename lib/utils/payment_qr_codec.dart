@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-\
+
 class PaymentQrPayload {
   static const typeKey = 'godetrans_payment';
 
